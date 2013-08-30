@@ -17,6 +17,9 @@ Version 0.01
 our $VERSION = '0.01';
 
 
+
+
+
 =head1 SYNOPSIS
 
 Quick summary of what the module does.
@@ -27,27 +30,6 @@ Perhaps a little code snippet.
 
     my $foo = WWW::FC2->new();
     ...
-
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
-=head1 SUBROUTINES/METHODS
-
-=head2 function1
-
-=cut
-
-sub function1 {
-}
-
-=head2 function2
-
-=cut
-
-sub function2 {
-}
 
 =head1 AUTHOR
 
@@ -137,5 +119,29 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 =cut
+
+#"
+
+sub new {
+    my $class = shift;
+
+    my %mod_parms = (
+        autocheck   => ($class eq 'WWW::FC2' ? 1 : 0),
+      #  onwarn      => \&WWW::Mechanize::_warn,
+      #  onerror     => \&WWW::Mechanize::_die,
+
+    );
+
+    my %passed_parms = @_;
+
+    # Keep the mech-specific parms before creating the object.
+    while ( my($key,$value) = each %passed_parms ) {
+            $mech_parms{$key} = $value;
+    }
+
+    return bless %mod_parms, $class;
+}
+
+
 
 1; # End of WWW::FC2
