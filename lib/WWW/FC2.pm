@@ -2,7 +2,7 @@ package WWW::FC2;
 
 use 5.006;
 use strict;
-use warnings FATAL => 'all';
+#use warnings FATAL => 'all';
 
 =head1 NAME
 
@@ -122,26 +122,126 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #"
 
+use Carp 'croak';
+use WWW::Mechanize::Cached;
+use Web::Scraper;
+use utf8;
 sub new {
     my $class = shift;
 
-    my %mod_parms = (
-        autocheck   => ($class eq 'WWW::FC2' ? 1 : 0),
-      #  onwarn      => \&WWW::Mechanize::_warn,
-      #  onerror     => \&WWW::Mechanize::_die,
-
-    );
 
     my %passed_parms = @_;
 
-    # Keep the mech-specific parms before creating the object.
-    while ( my($key,$value) = each %passed_parms ) {
-            $mech_parms{$key} = $value;
-    }
-
-    return bless %mod_parms, $class;
+    my $mod_parms = {
+        autocheck   => ($class eq 'WWW::FC2' ? 1 : 0),
+        email       =>  $passed_parms{'email'},
+        pass        =>  $passed_parms{'pass'},
+        mech        =>  WWW::Mechanize::Cached->new(),
+    };
+    
+	$mod_parms->{mech}->agent_alias( 'Windows Mozilla' );
+    return bless $mod_parms, $class;
 }
 
+
+
+
+sub login {
+	my $self = shift;
+    my %passed_parms = @_;
+	my $loginUrl = "http://fc2.com/login.php";
+	
+	$self->{mech}->get($loginUrl);
+	
+	if(!$self->{mech}->success()){
+	  croak "Can't access $loginUrl";
+	}
+	
+	if(! $self->{mech}->is_html()){
+	  croak "Can't access $loginUrl";
+	}
+	if(exists($passed_parms{email})){
+		$self->{email} = $passed_parms{email};
+	}elsif(! exists($self->{email})){
+	  croak "Please set email";
+	
+	}
+	
+	if(exists($passed_parms{pass})){
+		$self->{email} = $passed_parms{pass};
+	}elsif(! exists($self->{pass})){
+	  croak "Please set pass";
+	
+	}
+	$self->{mech}->submit_form(
+		form_name=>'form_login',
+		fields => {
+			email => $self->{email},
+			pass => $self->{pass},
+		},
+	);
+	
+	
+	
+
+	
+	if (! $self->{mech}->success()){
+	  croak "Can't login";
+	}
+	
+	$self->{mech}->get("http://id.fc2.com/?login=done");
+	$self->{mech}->get("http://video.fc2.com/");
+	$self->{mech}->get("https://secure.id.fc2.com/?done=video&switch_language=ja");
+	$self->{mech}->get("http://id.fc2.com/?mode=redirect&login=done");
+	
+	
+	print $self->{mech}->content;
+	
+	return $self;
+}
+
+sub get_movie{
+
+	my $self = shift;
+	my $target = shift;
+	
+	if(!defined($target)){
+	  croak "Please set target";
+	
+	}
+
+	#$self->{mech}->get("http://video.fc2.com/content/$target");
+
+	$self->{mech}->get($target);
+
+
+	if(!$self->{mech}->success()){
+	  croak "Can't access $target";
+	}
+	
+	if(! $self->{mech}->is_html()){
+	  croak "Can't access $target";
+	}
+	
+	my $scraper = scraper {
+		process '/html/head/meta[@property="og:title"]', title => '@content';
+		process '/html/head/meta[@property="og:url"]', url => '@content';
+		process '/html/head/meta[@name="keywords"]', keywords => '@content';
+		process '/html/head/meta[@name="description"]', description => '@content';
+		process '/html/body//input[@name="thumbimg"]', 'thumbimg[]' => ['@onchange', sub {s/^changeThumbnail\(\'(.*)\',\'.*\',\'.*\'\).*$/$1/sg;}];#'
+	};
+	
+	
+	
+	my $res = $scraper->scrape($self->{mech}->content);
+	
+	$res->{thumbnail}->{anim} = '<a href="' . $res->{url} . '" title="動画：'. $res->{title} .'" rel="nofollow"><img src="'. $res->{thumbimg}[0] . '" alt="動画：'. $res->{title} .'"></a>';
+	$res->{thumbnail}->{digest} = '<a href="' . $res->{url} . '" title="動画：'. $res->{title} .'" rel="nofollow"><img src="'. $res->{thumbimg}[1] . '" alt="動画：'. $res->{title} .'"></a>';
+	$res->{thumbnail}->{still} = '<a href="' . $res->{url} . '" title="動画：'. $res->{title} .'" rel="nofollow"><img src="'. $res->{thumbimg}[2] . '" alt="動画：'. $res->{title} .'"></a>';
+	
+	return $res;
+
+}
 
 
 1; # End of WWW::FC2
